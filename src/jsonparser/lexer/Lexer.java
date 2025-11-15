@@ -1,5 +1,6 @@
 package jsonparser.lexer;
 import jsonparser.util.*;
+import java.util.*;
 
 public class Lexer {
     private final CharReader reader;
@@ -184,4 +185,17 @@ public class Lexer {
     private boolean isAlpha(char c) {
         return (c >= 'a' && c <= 'z');
     }
+
+    public List<Token> tokenize() {
+        List<Token> tokens = new ArrayList<>();
+
+        Token token;
+        do {
+            token = nextToken();   // call the private method we wrote
+            tokens.add(token);
+        } while (token.getType() != TokenType.EOF);
+
+        return tokens;
+    }
+
 }
