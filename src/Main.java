@@ -16,7 +16,7 @@ public class Main {
         }
 
         // Step 2: Parse
-        Parser parser = new Parser(tokens);
+        Parser parser = new Parser(tokens, json);
         JsonValue value = parser.parse();
 
         System.out.println("\n=== PARSED VALUE ===");
