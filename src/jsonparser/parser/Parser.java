@@ -1,23 +1,34 @@
 package jsonparser.parser;
 
 import jsonparser.lexer.*;
+import jsonparser.util.*;
+
 import java.util.*;
 
 public class Parser {
 
     private final List<Token> tokens;
+    private final String originalInput;
     private int index = 0;
 
-    public Parser(List<Token> tokens) {
+    public Parser(List<Token> tokens, String originalInput) {
         this.tokens = tokens;
+        this.originalInput = originalInput;
     }
 
+    // Convenience constructor (parser without original input)
+    public Parser(List<Token> tokens) {
+        this(tokens, null);
+    }
+
+    // Entry point
     public JsonValue parse() {
         JsonValue value = parseValue();
         expect(TokenType.EOF);
         return value;
     }
 
+    // ---------- VALUE ----------
     private JsonValue parseValue() {
         Token t = peek();
 
@@ -40,10 +51,11 @@ public class Parser {
                 consume();
                 return new JsonPrimitive(null);
             default:
-                throw error("Unexpected token: " + t);
+                throw error("Unexpected token: " + t.getType());
         }
     }
 
+    // ---------- OBJECT ----------
     private JsonObject parseObject() {
         expect(TokenType.LEFT_BRACE);
         JsonObject obj = new JsonObject();
@@ -54,17 +66,17 @@ public class Parser {
         }
 
         do {
-            Token keyToken = expect(TokenType.STRING);
+            Token key = expect(TokenType.STRING);
             expect(TokenType.COLON);
             JsonValue value = parseValue();
-            obj.put(keyToken.getValue(), value);
+            obj.put(key.getValue(), value);
         } while (tryConsume(TokenType.COMMA));
 
         expect(TokenType.RIGHT_BRACE);
-
         return obj;
     }
 
+    // ---------- ARRAY ----------
     private JsonArray parseArray() {
         expect(TokenType.LEFT_BRACKET);
         JsonArray arr = new JsonArray();
@@ -79,14 +91,15 @@ public class Parser {
         } while (tryConsume(TokenType.COMMA));
 
         expect(TokenType.RIGHT_BRACKET);
-
         return arr;
     }
 
+    // ---------- NUMBER ----------
     private Double parseNumberLiteral(String num) {
         return Double.valueOf(num);
     }
 
+    // ---------- TOKEN HELPERS ----------
     private Token consume() {
         return tokens.get(index++);
     }
@@ -111,7 +124,22 @@ public class Parser {
         return tokens.get(index);
     }
 
-    private ParserException error(String msg) {
-        return new ParserException(msg);
+    // ---------- ERROR HANDLING ----------
+    private ParserException error(String message) {
+        Token t = peek();
+        String snippet = buildSnippet(t.getLine());
+
+        String fullMessage = message + " at " + t.getLine() + ":" + t.getColumn();
+
+        return new ParserException(fullMessage, t.getLine(), t.getColumn(), snippet);
+    }
+
+    private String buildSnippet(int errorLine) {
+        if (originalInput == null) return null;
+
+        String[] lines = originalInput.split("\n");
+        if (errorLine <= 0 || errorLine > lines.length) return null;
+
+        return lines[errorLine - 1];
     }
 }

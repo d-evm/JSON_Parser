@@ -1,4 +1,5 @@
 package jsonparser.lexer;
+
 import jsonparser.util.*;
 import java.util.*;
 
@@ -50,8 +51,11 @@ public class Lexer {
                 }
         }
 
-        throw new LexerException("Unexpected character: '" + c + "' at "
-                + pos.getLine() + ":" + pos.getColumn());
+        throw new LexerException(
+                "Unexpected character: '" + c + "'",
+                pos.getLine(),
+                pos.getColumn()
+        );
     }
 
     private void skipWhitespace() {
@@ -77,6 +81,9 @@ public class Lexer {
             }
 
             if (c == '\\') {  // handle escape sequences
+                if (!reader.hasNext()) {
+                    throw new LexerException("Invalid escape sequence", pos.getLine(), pos.getColumn());
+                }
                 char escaped = reader.advance();
                 switch (escaped) {
                     case '"': sb.append('"'); break;
@@ -88,28 +95,41 @@ public class Lexer {
                     case 'r': sb.append('\r'); break;
                     case 't': sb.append('\t'); break;
                     case 'u':
-                        sb.append(parseUnicodeEscape());
+                        sb.append(parseUnicodeEscape(pos));
                         break;
                     default:
-                        throw new LexerException("Invalid escape sequence: \\" + escaped);
+                        throw new LexerException(
+                                "Invalid escape sequence: \\" + escaped,
+                                pos.getLine(),
+                                pos.getColumn()
+                        );
                 }
             } else {
                 sb.append(c);
             }
         }
 
-        throw new LexerException("Unterminated string at " + pos.getLine() + ":" + pos.getColumn());
+        throw new LexerException(
+                "Unterminated string",
+                pos.getLine(),
+                pos.getColumn()
+        );
     }
 
-    private char parseUnicodeEscape() {
+    private char parseUnicodeEscape(Position pos) {
         StringBuilder hex = new StringBuilder();
         for (int i = 0; i < 4; i++) {
             if (!reader.hasNext()) {
-                throw new LexerException("Incomplete unicode escape");
+                throw new LexerException("Incomplete unicode escape", pos.getLine(), pos.getColumn());
             }
             hex.append(reader.advance());
         }
-        return (char) Integer.parseInt(hex.toString(), 16);
+
+        try {
+            return (char) Integer.parseInt(hex.toString(), 16);
+        } catch (Exception e) {
+            throw new LexerException("Invalid unicode escape: \\u" + hex, pos.getLine(), pos.getColumn());
+        }
     }
 
     private Token numberToken() {
@@ -121,15 +141,17 @@ public class Lexer {
             sb.append(reader.advance());
         }
 
-        if (!reader.hasNext()) throw new LexerException("Invalid number");
+        if (!reader.hasNext())
+            throw new LexerException("Invalid number", pos.getLine(), pos.getColumn());
 
         c = reader.peek();
-        if (!isDigit(c)) throw new LexerException("Invalid number start");
+        if (!isDigit(c))
+            throw new LexerException("Invalid number start", pos.getLine(), pos.getColumn());
 
         if (c == '0') {
             sb.append(reader.advance());
             if (reader.hasNext() && isDigit(reader.peek())) {
-                throw new LexerException("Leading zeros not allowed");
+                throw new LexerException("Leading zeros not allowed", pos.getLine(), pos.getColumn());
             }
         } else {
             while (reader.hasNext() && isDigit(reader.peek())) {
@@ -139,7 +161,9 @@ public class Lexer {
 
         if (reader.hasNext() && reader.peek() == '.') {
             sb.append(reader.advance());
-            if (!isDigit(reader.peek())) throw new LexerException("Invalid decimal");
+            if (!reader.hasNext() || !isDigit(reader.peek())) {
+                throw new LexerException("Invalid decimal format", pos.getLine(), pos.getColumn());
+            }
             while (reader.hasNext() && isDigit(reader.peek())) {
                 sb.append(reader.advance());
             }
@@ -150,7 +174,9 @@ public class Lexer {
             if (reader.peek() == '+' || reader.peek() == '-') {
                 sb.append(reader.advance());
             }
-            if (!isDigit(reader.peek())) throw new LexerException("Invalid exponent");
+            if (!reader.hasNext() || !isDigit(reader.peek())) {
+                throw new LexerException("Invalid exponent", pos.getLine(), pos.getColumn());
+            }
             while (reader.hasNext() && isDigit(reader.peek())) {
                 sb.append(reader.advance());
             }
@@ -174,7 +200,7 @@ public class Lexer {
             case "false" -> new Token(TokenType.FALSE, literal, pos.getLine(), pos.getColumn());
             case "null" -> new Token(TokenType.NULL, literal, pos.getLine(), pos.getColumn());
             default ->
-                    throw new LexerException("Invalid literal: " + literal + " at " + pos.getLine() + ":" + pos.getColumn());
+                    throw new LexerException("Invalid literal: " + literal, pos.getLine(), pos.getColumn());
         };
     }
 
@@ -191,11 +217,10 @@ public class Lexer {
 
         Token token;
         do {
-            token = nextToken();   // call the private method we wrote
+            token = nextToken();
             tokens.add(token);
         } while (token.getType() != TokenType.EOF);
 
         return tokens;
     }
-
 }
